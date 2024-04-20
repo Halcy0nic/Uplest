@@ -31,11 +31,11 @@ conn = psycopg2.connect(connection_string)
 conn.autocommit = True
 
 # Delete the existing DB if desired
-"""
+
 with conn.cursor() as c:
     c.execute(f"DROP DATABASE IF EXISTS {db_name}")
     c.execute(f"CREATE DATABASE {db_name}")
-"""
+
 url = make_url(connection_string)
 vector_store = PGVectorStore.from_params(
     database=db_name,
@@ -52,15 +52,15 @@ vector_store = PGVectorStore.from_params(
 
 
 """
-Function: caption_image_documents
+Function: caption_docx_image_documents
 
-Captions an image by generating a description using the Ollama LLM.
+Captions an image by generating a description using the Llava Multimodal Model.
 
 Args:
     image (str): Filename of the image.
     file_origin (str): Originating document name.
 """
-def caption_image_documents(image, file_origin):
+def caption_docx_image_documents(image, file_origin):
         with open(image_path+"/"+file_origin+"/"+image, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read())
         response = ol.generate(model='llava', prompt=pt1, images=[encoded_string])
@@ -68,6 +68,24 @@ def caption_image_documents(image, file_origin):
         summary = f"\nImage Name: {file_origin}.docx\nDescription: {response['response']}\n\n"
         document = Document(text=summary,metadata={"file_name": file_origin+".docx"})
         documents.append(document)
+
+"""
+Function: caption_image_file
+
+Captions an image by generating a description using the Llava Multimodal Model.
+
+Args:
+    image_fname (str): Filename of the image.
+"""
+
+def caption_image_file(image_fname):
+    with open(image_fname, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read())
+            response = ol.generate(model='llava', prompt=pt1, images=[encoded_string])
+            #print(response['response'])
+            summary = f"\nImage Name: {image_fname}\nDescription: {response['response']}\n\n"
+            document = Document(text=summary,metadata={"file_name": image_fname})
+            documents.append(document)
 
 """
 Function: process_docx_and_extract_images
@@ -157,14 +175,16 @@ for file in os.listdir(directory_path):
 
         # Example of generating captions with references to the original .docx file
         for image in extracted_images:
-            caption_image_documents(image, docx_name)
+            caption_docx_image_documents(image, docx_name)
 
     elif file.endswith(".pdf"):
         # Add OCR to PDF files where applicable
-        ocr(directory_path+file, directory_path+file[:-4]+"-ocr.pdf")
+        ocr(directory_path+"/"+file, directory_path+file[:-4]+"-ocr.pdf")
         # Extract images from the PDF file
         extract_pdf(directory_path+"/"+file)
-
+        
+    elif file.endswith(".png") or file.endswith(".png") or file.endswith(".jpeg"):
+        caption_image_file(directory_path+"/"+file)
 
 
 index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
